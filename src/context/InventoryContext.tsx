@@ -4,9 +4,14 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInAnonymously,
+  linkWithCredential,
+  EmailAuthProvider,
+  sendEmailVerification,
   signOut
 } from 'firebase/auth';
 import { 
+  terminate,
+  clearIndexedDbPersistence,
   onSnapshot,
   doc, 
   setDoc, 
@@ -53,6 +58,8 @@ interface User {
   id: string;
   username: string;
   businessName: string;
+  setupComplete: boolean;
+  isGuest: boolean;
 }
 
 interface InventoryContextType {
@@ -67,6 +74,7 @@ interface InventoryContextType {
   login: (u: string, p: string) => Promise<void>;
   register: (u: string, p: string, b: string) => Promise<void>;
   guestLogin: () => Promise<void>;
+  upgradeAccount: (e: string, p: string) => Promise<void>;
   logout: () => void;
   addProduct: (p: Omit<Product, 'id'>) => Promise<void>;
   updateProduct: (id: string, u: Partial<Product>) => Promise<void>;
@@ -79,11 +87,14 @@ interface InventoryContextType {
   recordTransaction: (t: Omit<Transaction, 'id' | 'date'>) => Promise<void>;
   updateSettings: (u: Partial<BusinessSettings>) => Promise<void>;
   clearAllData: () => Promise<void>;
+  clearCache: () => Promise<void>;
   totalCapital: number;
   totalSales: number;
   totalProfit: number;
   inventoryValue: number;
   loading: boolean;
+  isLoggingIn: boolean;
+  isLoggingOut: boolean;
   activeTab: string;
   setActiveTab: (t: string) => void;
 }
@@ -93,6 +104,8 @@ const InventoryContext = createContext<InventoryContextType | undefined>(undefin
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -113,39 +126,68 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const login = async (email: string, pass: string) => {
-    await signInWithEmailAndPassword(auth, email, pass);
+    setIsLoggingIn(true);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), pass.trim());
+    } catch (err: any) {
+      console.error("Firebase Login Error:", err.code, err.message);
+      setIsLoggingIn(false);
+      throw err;
+    }
   };
 
   const register = async (email: string, pass: string, businessName: string) => {
-    const res = await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db, 'users', res.user.uid), {
-      businessName,
-      products: [],
-      transactions: [],
-      categories: [],
-      suppliers: [],
-      customers: [],
-      debts: [],
-      settings: {
+    try {
+      const res = await createUserWithEmailAndPassword(auth, email.trim(), pass.trim());
+      
+      // 1. Send verification link (Our "OTP" equivalent)
+      await sendEmailVerification(res.user);
+      
+      // 2. Create the profile
+      await setDoc(doc(db, 'users', res.user.uid), {
         businessName,
-        currency: '₱',
-        lowStockThreshold: 5,
-        initialCapital: 0,
-        theme: 'dark'
-      }
-    });
+        setupComplete: false,
+        products: [],
+        transactions: [],
+        categories: [],
+        suppliers: [],
+        customers: [],
+        debts: [],
+        settings: {
+          businessName,
+          currency: '₱',
+          lowStockThreshold: 5,
+          initialCapital: 0,
+          theme: 'dark'
+        }
+      });
+    } catch (err: any) {
+      console.error("Firebase Register Error:", err.code, err.message);
+      throw err;
+    }
+  };
+
+  const upgradeAccount = async (email: string, pass: string) => {
+    if (!auth.currentUser) throw new Error("No active guest session");
+    const credential = EmailAuthProvider.credential(email.trim(), pass.trim());
+    await linkWithCredential(auth.currentUser, credential);
   };
 
   const logout = async () => {
-    await signOut(auth);
-    setUser(null);
-    setProducts([]);
-    setTransactions([]);
-    setCategories([]);
-    setSuppliers([]);
-    setCustomers([]);
-    setDebts([]);
-    setActiveTab('dashboard');
+    setIsLoggingOut(true);
+    // Brief delay to show logout screen before clearing state
+    setTimeout(async () => {
+      await signOut(auth);
+      setUser(null);
+      setProducts([]);
+      setTransactions([]);
+      setCategories([]);
+      setSuppliers([]);
+      setCustomers([]);
+      setDebts([]);
+      setActiveTab('dashboard');
+      setIsLoggingOut(false);
+    }, 1500);
   };
 
   // HELPER: Sync entire state to Firestore
@@ -157,6 +199,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        setIsLoggingIn(true);
         const userRef = doc(db, 'users', firebaseUser.uid);
         const unsubDoc = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
@@ -176,9 +219,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             });
             setUser({
               id: firebaseUser.uid,
-              username: firebaseUser.email?.split('@')[0] || 'User',
-              businessName: data.settings?.businessName || data.businessName || 'My Business'
+              username: firebaseUser.isAnonymous ? 'Guest User' : (firebaseUser.email?.split('@')[0] || 'User'),
+              businessName: data.settings?.businessName || data.businessName || 'My Business',
+              setupComplete: data.setupComplete ?? true,
+              isGuest: firebaseUser.isAnonymous
             });
+            setIsLoggingIn(false);
           } else {
             setDoc(userRef, {
               businessName: 'My Business',
@@ -288,6 +334,17 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
+  const clearCache = async () => {
+    try {
+      await terminate(db);
+      await clearIndexedDbPersistence(db);
+      window.location.reload();
+    } catch (err) {
+      console.error("Clear cache failed:", err);
+      window.location.reload(); // Fallback to reload
+    }
+  };
+
   // CALCULATIONS
   const inventoryValue = products.reduce((acc, p) => acc + (p.stock * p.costPrice), 0);
   const totalSales = transactions.filter(t => t.type === 'sale').reduce((acc, t) => acc + t.amount, 0);
@@ -302,9 +359,10 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   return (
     <InventoryContext.Provider value={{ 
       user, products, transactions, categories, suppliers, customers, debts, settings, 
-      login, register, guestLogin, logout, addProduct, updateProduct, deleteProduct, 
+      login, register, guestLogin, upgradeAccount, logout, addProduct, updateProduct, deleteProduct, 
       addCategory, addSupplier, addCustomer, addDebt, updateDebtStatus, recordTransaction,
-      updateSettings, clearAllData, totalCapital, totalSales, totalProfit, inventoryValue, loading,
+      updateSettings, clearAllData, clearCache, totalCapital, totalSales, totalProfit, inventoryValue, loading,
+      isLoggingIn, isLoggingOut,
       activeTab, setActiveTab
     }}>
       {children}

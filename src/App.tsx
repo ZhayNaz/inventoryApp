@@ -1,23 +1,27 @@
 import { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { InventoryProvider, useInventory } from './context/InventoryContext';
-import { BusinessStats } from './components/BusinessStats';
-import { InventoryList } from './components/InventoryList';
-import { Navigation } from './components/Navigation';
-import { AddProductModal } from './components/AddProductModal';
-import { SettingsManager } from './components/SettingsManager';
-import { LandingPage } from './components/LandingPage';
-import { SalePage } from './components/SalePage';
-import { RestockPage } from './components/RestockPage';
-import { ThemeToggle } from './components/ThemeToggle';
-import { HistoryPage } from './components/HistoryPage';
-import { LoadingScreen } from './components/LoadingScreen';
+import { BusinessStats } from './components/features/BusinessStats';
+import { InventoryList } from './components/features/InventoryList';
+import { Navigation } from './components/layout/Navigation';
+import { AddProductModal } from './components/ui/AddProductModal';
+import { SettingsManager } from './components/features/SettingsManager';
+import { LandingPage } from './components/auth/LandingPage';
+import { SalePage } from './components/features/SalePage';
+import { RestockPage } from './components/features/RestockPage';
+import { ThemeToggle } from './components/layout/ThemeToggle';
+import { HistoryPage } from './components/features/HistoryPage';
+import { LoadingScreen } from './components/layout/LoadingScreen';
+import { LoginLoadingScreen } from './components/auth/LoginLoadingScreen';
+import { LogoutLoadingScreen } from './components/auth/LogoutLoadingScreen';
 import { Plus, Menu } from 'lucide-react';
 
 function App() {
   const { 
     user, 
     loading, 
+    isLoggingIn,
+    isLoggingOut,
     activeTab, 
     setActiveTab, 
     settings 
@@ -30,6 +34,14 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme);
   }, [settings.theme]);
+
+  if (isLoggingOut) {
+    return <LogoutLoadingScreen />;
+  }
+
+  if (isLoggingIn) {
+    return <LoginLoadingScreen />;
+  }
 
   if (loading) {
     return <LoadingScreen />;

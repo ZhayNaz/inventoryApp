@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useInventory } from '../context/InventoryContext';
+import { useInventory } from '../../context/InventoryContext';
 import { Search, Package, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

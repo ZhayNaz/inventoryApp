@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useInventory } from '../context/InventoryContext';
+import { useInventory } from '../../context/InventoryContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, TrendingUp, Globe, Smartphone, ArrowRight } from 'lucide-react';
 
@@ -8,9 +8,10 @@ export const LandingPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [needsVerification, setNeedsVerification] = useState(false);
+
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: '',
     businessName: ''
   });
@@ -21,14 +22,34 @@ export const LandingPage: React.FC = () => {
     setError('');
     try {
       if (isLogin) {
-        await login(formData.username, formData.password);
+        await login(formData.email, formData.password);
+        setError('success:Welcome back! Preparing your workspace...');
       } else {
-        await register(formData.username, formData.password, formData.businessName);
+        await register(formData.email, formData.password, formData.businessName);
+        setNeedsVerification(true);
+        setError('success:Verification link sent to your email!');
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
-    } finally {
+      console.error("Auth Exception:", err);
+      let msg = 'Authentication failed';
+      const code = err.code || '';
+      
+      if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
+        msg = 'Invalid email or password';
+      } else if (code.includes('invalid-email')) {
+        msg = 'Please enter a valid email address';
+      } else if (code.includes('operation-not-allowed')) {
+        msg = 'Email login is currently disabled';
+      } else if (code.includes('email-already-in-use')) {
+        msg = 'This email is already registered';
+      } else if (code.includes('weak-password')) {
+        msg = 'Password is too weak (min 6 chars)';
+      } else if (code.includes('too-many-requests')) {
+        msg = 'Too many failed attempts. Try again later.';
+      }
+      setError(msg);
       setLoading(false);
+      setTimeout(() => setError(''), 4000);
     }
   };
 
@@ -37,15 +58,103 @@ export const LandingPage: React.FC = () => {
     setError('');
     try {
       await guestLogin();
+      setError('success:Entering Guest Mode... Synchronizing local workspace.');
     } catch (err: any) {
-      setError(err.message || 'Guest login failed');
-    } finally {
+      setError('Guest login failed');
       setLoading(false);
+      setTimeout(() => setError(''), 4000);
     }
   };
 
+  if (needsVerification) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-dark)', padding: '2rem' }}>
+        <div className="fade-in glass-card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center', padding: '3rem 2rem' }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', margin: '0 auto 2rem' }}>
+            <Globe size={40} />
+          </div>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Verify Your Email</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+            We've sent a verification link to <strong>{formData.email}</strong>. Please check your inbox and click the link to activate your account.
+          </p>
+          
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <button 
+              className="btn btn-primary" 
+              style={{ width: '100%', padding: '1rem' }}
+              onClick={() => window.location.reload()}
+            >
+              I've Verified My Email
+            </button>
+            <button 
+              className="btn" 
+              style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}
+              onClick={() => setNeedsVerification(false)}
+            >
+              Back to Login
+            </button>
+          </div>
+          
+          <p style={{ marginTop: '2rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Didn't receive code? <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Resend Link</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', padding: 'var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left)' }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', padding: 'var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left)', overflow: 'hidden' }}>
+      {/* Premium Alert Overlay */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            style={{
+              position: 'fixed',
+              top: '2rem',
+              left: '1rem',
+              right: '1rem',
+              zIndex: 1000,
+              display: 'flex',
+              justifyContent: 'center'
+            }}
+          >
+            <div style={{
+              background: error.startsWith('success:') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: `1px solid ${error.startsWith('success:') ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+              borderRadius: '16px',
+              padding: '1rem 1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+              maxWidth: '400px',
+              width: '100%'
+            }}>
+              <div style={{ 
+                background: error.startsWith('success:') ? '#10b981' : '#ef4444', 
+                height: '8px', 
+                width: '8px', 
+                borderRadius: '50%', 
+                boxShadow: `0 0 10px ${error.startsWith('success:') ? '#10b981' : '#ef4444'}` 
+              }} />
+              <p style={{ 
+                color: error.startsWith('success:') ? '#a7f3d0' : '#fca5a5', 
+                fontWeight: '500', 
+                fontSize: '0.9rem', 
+                margin: 0 
+              }}>
+                {error.replace('success:', '')}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div style={{ padding: 'clamp(1rem, 5vw, 3rem) clamp(1rem, 5vw, 2rem) 1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
           <div style={{ padding: '0.75rem', borderRadius: '15px', background: 'linear-gradient(135deg, var(--primary), #818cf8)' }}>
@@ -101,14 +210,14 @@ export const LandingPage: React.FC = () => {
             </AnimatePresence>
 
             <div className="input-group">
-              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Username</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Email Address</label>
               <input 
                 required
-                type="text" 
+                type="email" 
                 className="input-field" 
-                placeholder="mabie_shop"
-                value={formData.username}
-                onChange={e => setFormData({...formData, username: e.target.value})}
+                placeholder="mabie@shop.com"
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
               />
             </div>
 
@@ -123,8 +232,6 @@ export const LandingPage: React.FC = () => {
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
             </div>
-
-            {error && <p style={{ color: 'var(--accent-rose)', fontSize: '0.85rem', textAlign: 'center' }}>{error}</p>}
 
             <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', padding: '1rem', marginTop: '1rem' }}>
               {loading ? 'Processing...' : (isLogin ? 'Login Account' : 'Create Account')}

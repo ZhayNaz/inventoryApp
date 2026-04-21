@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useInventory } from '../context/InventoryContext';
+import { useState } from 'react';
+import { useInventory } from '../../context/InventoryContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DollarSign, TrendingUp, TrendingDown, Briefcase, BarChart3, Plus, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

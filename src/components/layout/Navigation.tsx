@@ -10,7 +10,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useInventory } from '../context/InventoryContext';
+import { useInventory } from '../../context/InventoryContext';
 
 interface NavigationProps {
   activeTab: string;

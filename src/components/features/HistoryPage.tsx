@@ -1,5 +1,5 @@
 import React from 'react';
-import { useInventory } from '../context/InventoryContext';
+import { useInventory } from '../../context/InventoryContext';
 import { TrendingUp, TrendingDown, Package, Clock, User, Truck } from 'lucide-react';
 import { motion } from 'framer-motion';
 
