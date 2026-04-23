@@ -140,6 +140,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [restockCart, setRestockCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [isInitialSyncComplete, setIsInitialSyncComplete] = useState(false);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -307,7 +308,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // NEW: Sync everything to cloud in one batch
   const syncAllToCloud = async () => {
-    if (!user) return;
+    if (!user || !isInitialSyncComplete) return;
     try {
       console.log("Starting batch sync to cloud...");
       const userRef = doc(db, 'users', user.id);
@@ -382,6 +383,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               setupComplete: data.setupComplete ?? true,
               isGuest: firebaseUser.isAnonymous
             });
+            setIsInitialSyncComplete(true);
             setIsLoggingIn(false);
           } else {
             setDoc(userRef, {
@@ -425,38 +427,46 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const addProduct = async (p: Omit<Product, 'id'>) => {
     const newP = { ...sanitize(p), id: Date.now().toString() };
     setProducts(prev => [...prev, newP]);
+    setTimeout(syncAllToCloud, 0);
   };
 
   const updateProduct = async (id: string, u: Partial<Product>) => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, ...sanitize(u) } : p));
+    setTimeout(syncAllToCloud, 0);
   };
 
   const deleteProduct = async (id: string) => {
     setProducts(prev => prev.filter(p => p.id !== id));
+    setTimeout(syncAllToCloud, 0);
   };
 
   const addCategory = async (name: string) => {
     const newC = { id: Date.now().toString(), name };
     setCategories(prev => [...prev, newC]);
+    setTimeout(syncAllToCloud, 0);
   };
 
   const addSupplier = async (s: Omit<Supplier, 'id'>) => {
     const newS = { ...sanitize(s), id: Date.now().toString() };
     setSuppliers(prev => [...prev, newS]);
+    setTimeout(syncAllToCloud, 0);
   };
 
   const addCustomer = async (c: Omit<Customer, 'id'>) => {
     const newC = { ...sanitize(c), id: Date.now().toString() };
     setCustomers(prev => [...prev, newC]);
+    setTimeout(syncAllToCloud, 0);
   };
 
   const addDebt = async (d: Omit<Debt, 'id' | 'status'>) => {
     const newD = { ...sanitize(d), id: Date.now().toString(), status: 'pending' };
     setDebts(prev => [...prev, newD]);
+    setTimeout(syncAllToCloud, 0);
   };
 
   const updateDebtStatus = async (id: string, status: 'pending' | 'paid') => {
     setDebts(prev => prev.map(d => d.id === id ? { ...d, status } : d));
+    setTimeout(syncAllToCloud, 0);
   };
 
   const recordTransaction = async (t: Omit<Transaction, 'id' | 'date'>) => {
@@ -471,6 +481,9 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       return p;
     }));
+
+    // AUTO-SYNC TO CLOUD
+    setTimeout(syncAllToCloud, 0);
   };
 
   const updateSettings = async (u: Partial<BusinessSettings>) => {
@@ -507,8 +520,9 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return acc + (t.quantity * (p?.costPrice || 0));
   }, 0);
   
+  const totalPurchases = transactions.filter(t => t.type === 'purchase').reduce((acc, t) => acc + t.amount, 0);
   const totalProfit = totalSales - totalCostOfSales;
-  const totalCapital = settings.initialCapital + totalProfit;
+  const totalCapital = settings.initialCapital + totalSales - totalPurchases;
 
   return (
     <InventoryContext.Provider value={{ 
