@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Package, TrendingUp, Globe, Smartphone, ArrowRight } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
-  const { login, register, guestLogin } = useInventory();
+  const { user, login, register, upgradeAccount, guestLogin } = useInventory();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,31 +25,42 @@ export const LandingPage: React.FC = () => {
         await login(formData.email, formData.password);
         setError('success:Welcome back! Preparing your workspace...');
       } else {
-        await register(formData.email, formData.password, formData.businessName);
-        setNeedsVerification(true);
-        setError('success:Verification link sent to your email!');
+        // PREVENTION: If they are currently a guest, we MUST upgrade them to keep their data
+        if (user?.isGuest) {
+          await upgradeAccount(formData.email, formData.password);
+          setError('success:Guest account upgraded! Your data is now synced to your email.');
+        } else {
+          await register(formData.email, formData.password, formData.businessName);
+          setNeedsVerification(true);
+          setError('success:Verification link sent to your email!');
+        }
       }
     } catch (err: any) {
       console.error("Auth Exception:", err);
       let msg = 'Authentication failed';
       const code = err.code || '';
       
-      if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
-        msg = 'Invalid email or password';
-      } else if (code.includes('invalid-email')) {
-        msg = 'Please enter a valid email address';
-      } else if (code.includes('operation-not-allowed')) {
-        msg = 'Email login is currently disabled';
-      } else if (code.includes('email-already-in-use')) {
-        msg = 'This email is already registered';
-      } else if (code.includes('weak-password')) {
-        msg = 'Password is too weak (min 6 chars)';
-      } else if (code.includes('too-many-requests')) {
-        msg = 'Too many failed attempts. Try again later.';
-      }
+      const errorMap: Record<string, string> = {
+        'auth/invalid-credential': 'Invalid email or password',
+        'auth/user-not-found': 'Account not found. Please sign up',
+        'auth/wrong-password': 'Incorrect password. Try again',
+        'auth/invalid-email': 'Please enter a valid email format',
+        'auth/email-already-in-use': 'This email is already registered',
+        'auth/weak-password': 'Password is too weak (min 6 characters)',
+        'auth/too-many-requests': 'Too many attempts. Access temporarily blocked',
+        'auth/user-disabled': 'This account has been disabled',
+        'auth/network-request-failed': 'Network error. Check your internet',
+        'auth/operation-not-allowed': 'Email/Password login is not enabled',
+        'auth/internal-error': 'Server error. Please try again later',
+        'auth/requires-recent-login': 'Security timeout. Please login again'
+      };
+
+      // Find match or use generic message
+      msg = Object.entries(errorMap).find(([key]) => code.includes(key))?.[1] || 'Authentication failed. Please try again';
+      
       setError(msg);
       setLoading(false);
-      setTimeout(() => setError(''), 4000);
+      setTimeout(() => setError(''), 5000);
     }
   };
 
@@ -211,14 +222,14 @@ export const LandingPage: React.FC = () => {
 
             <div className="input-group">
               <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Email Address</label>
-              <input 
-                required
-                type="email" 
-                className="input-field" 
-                placeholder="mabie@shop.com"
-                value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
-              />
+                <input 
+                  required
+                  type="email" 
+                  className="input-field" 
+                  placeholder="example@email.com"
+                  value={formData.email}
+                  onChange={e => setFormData({...formData, email: e.target.value})}
+                />
             </div>
 
             <div className="input-group">

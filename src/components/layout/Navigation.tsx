@@ -132,7 +132,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab,
         </div>
 
         <div style={{ marginTop: 'auto', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '15px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Version 2.0.0 Cloud</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Inventory Pro v1.0.4 | Made By Zhay</div>
           <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Sync Status: Online</div>
         </div>
       </motion.nav>

@@ -14,7 +14,8 @@ import { HistoryPage } from './components/features/HistoryPage';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { LoginLoadingScreen } from './components/auth/LoginLoadingScreen';
 import { LogoutLoadingScreen } from './components/auth/LogoutLoadingScreen';
-import { Plus, Menu, ShoppingCart } from 'lucide-react';
+import { OnboardingTutorial } from './components/ui/OnboardingTutorial';
+import { Plus, Menu, ShoppingCart, PackagePlus } from 'lucide-react';
 
 function App() {
   const { 
@@ -26,6 +27,7 @@ function App() {
     setActiveTab, 
     settings,
     cart,
+    restockCart,
     setSaleView
   } = useInventory();
   
@@ -206,6 +208,65 @@ function App() {
           </motion.button>
         )}
       </AnimatePresence>
+
+      {/* Global Floating Restock Notification */}
+      <AnimatePresence>
+        {restockCart.length > 0 && activeTab !== 'restock' && (
+          <motion.button
+            initial={{ scale: 0, y: 100, x: 100 }}
+            animate={{ scale: 1, y: 0, x: 0 }}
+            exit={{ scale: 0, y: 100, x: 100 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setActiveTab('restock')}
+            style={{
+              position: 'fixed',
+              bottom: cart.length > 0 && activeTab !== 'sale' ? 'calc(5.5rem + var(--safe-bottom))' : 'calc(1.5rem + var(--safe-bottom))',
+              right: 'max(20px, calc(10px + var(--safe-right)))',
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: 'var(--accent-emerald)',
+              color: 'white',
+              border: 'none',
+              boxShadow: '0 12px 40px rgba(16, 185, 129, 0.4)',
+              cursor: 'pointer',
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <PackagePlus size={28} strokeWidth={2.5} />
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              style={{ 
+                position: 'absolute', 
+                top: '-8px', 
+                right: '-8px', 
+                background: 'white', 
+                color: 'var(--accent-emerald)', 
+                minWidth: '24px', 
+                height: '24px', 
+                padding: '0 6px', 
+                borderRadius: '12px', 
+                fontSize: '0.75rem', 
+                fontWeight: '900', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                border: '2px solid var(--accent-emerald)' 
+              }}
+            >
+              {restockCart.reduce((a, b) => a + b.quantity, 0)}
+            </motion.div>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <OnboardingTutorial />
     </div>
   );
 }

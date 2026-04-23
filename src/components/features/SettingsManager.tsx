@@ -3,7 +3,8 @@ import { useInventory } from '../../context/InventoryContext';
 import { User, Trash2, ChevronRight, Building, DollarSign, AlertCircle, RefreshCcw, Headphones, MessageSquareShare } from 'lucide-react';
 
 export const SettingsManager: React.FC = () => {
-  const { user, settings, updateSettings, clearAllData, clearCache, upgradeAccount } = useInventory();
+  const { user, settings, updateSettings, clearAllData, clearCache, upgradeAccount, syncAllToCloud, lastSynced } = useInventory();
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [upgradeForm, setUpgradeForm] = useState({ email: '', password: '' });
   const [upgradeLoading, setUpgradeLoading] = useState(false);
@@ -22,6 +23,12 @@ export const SettingsManager: React.FC = () => {
     } finally {
       setUpgradeLoading(false);
     }
+  };
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    await syncAllToCloud();
+    setTimeout(() => setIsSyncing(false), 800);
   };
 
   const handleClearData = () => {
@@ -118,6 +125,31 @@ export const SettingsManager: React.FC = () => {
             value={settings.businessName}
             onChange={(e) => updateSettings({ businessName: e.target.value })}
           />
+        </div>
+      </div>
+
+      <h3 style={{ fontSize: '1rem', color: 'var(--text-muted)', marginBottom: '1rem', marginLeft: '0.5rem' }}>Cloud Synchronization</h3>
+      <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <div style={{ color: 'var(--primary)' }}>
+              <RefreshCcw size={20} className={isSyncing ? 'spinner' : ''} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>Cloud Backup</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {lastSynced ? `Last synced at ${lastSynced}` : 'Not synced yet this session'}
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="btn btn-primary" 
+            style={{ padding: '0.6rem 1rem', fontSize: '0.85rem' }}
+          >
+            {isSyncing ? 'Syncing...' : 'Sync Now'}
+          </button>
         </div>
       </div>
 
@@ -263,7 +295,7 @@ export const SettingsManager: React.FC = () => {
       </div>
 
       <p style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2rem' }}>
-        Inventory Pro v1.0.4 | Made with ❤️
+        Inventory Pro v1.0.4 | Made By Zhay
       </p>
     </div>
   );

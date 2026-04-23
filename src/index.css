@@ -16,11 +16,13 @@
 }
 
 [data-theme='light'] {
-  --bg-dark: #f1f5f9;
-  --bg-card: rgba(255, 255, 255, 0.8);
-  --text-main: #0f172a;
+  --bg-dark: #f8fafc;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --text-main: #1e293b;
   --text-muted: #64748b;
-  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
 }
 
 * {
@@ -148,7 +150,7 @@ h1, h2, h3 {
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 0.8rem;
-  color: white;
+  color: var(--text-main);
   outline: none;
   font-size: 16px; /* Prevents iOS auto-zoom on focus */
 }

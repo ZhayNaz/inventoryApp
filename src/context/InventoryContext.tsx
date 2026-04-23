@@ -104,6 +104,14 @@ interface InventoryContextType {
   updateCartQuantity: (id: string, d: number) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
+  restockCart: { product: Product; quantity: number }[];
+  addToRestockCart: (p: Product) => void;
+  updateRestockQuantity: (id: string, d: number) => void;
+  removeFromRestockCart: (id: string) => void;
+  clearRestockCart: () => void;
+  syncAllToCloud: () => Promise<void>;
+  lastSynced: string | null;
+  completeOnboarding: () => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -130,6 +138,8 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [saleView, setSaleView] = useState<'products' | 'checkout'>('products');
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
+  const [restockCart, setRestockCart] = useState<{ product: Product; quantity: number }[]>([]);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -159,6 +169,44 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const clearCart = () => setCart([]);
+
+  const addToRestockCart = (product: Product) => {
+    setRestockCart(prev => {
+      const existing = prev.find(item => item.product.id === product.id);
+      if (existing) {
+        return prev.map(item => 
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  const updateRestockQuantity = (productId: string, delta: number) => {
+    setRestockCart(prev => prev.map(item => {
+      if (item.product.id === productId) {
+        const newQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }));
+  };
+
+  const removeFromRestockCart = (productId: string) => {
+    setRestockCart(prev => prev.filter(item => item.product.id !== productId));
+  };
+
+  const clearRestockCart = () => setRestockCart([]);
+
+  const completeOnboarding = async () => {
+    if (!user) return;
+    const updatedUser = { ...user, setupComplete: true };
+    setUser(updatedUser);
+    
+    // Sync to cloud immediately
+    const userRef = doc(db, 'users', user.id);
+    await updateDoc(userRef, { setupComplete: true });
+  };
 
   const guestLogin = async () => {
     await signInAnonymously(auth);
@@ -215,10 +263,17 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const logout = async () => {
     setIsLoggingOut(true);
-    // Brief delay to show logout screen before clearing state
-    setTimeout(async () => {
+    try {
+      // 1. Give the user a moment to see the "Logging out" animation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 2. Perform the final cloud sync
       await syncAllToCloud();
+      
+      // 3. Sign out of Firebase
       await signOut(auth);
+      
+      // 4. Clear local state
       setUser(null);
       setProducts([]);
       setTransactions([]);
@@ -226,9 +281,19 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setSuppliers([]);
       setCustomers([]);
       setDebts([]);
+      setCart([]);
+      setRestockCart([]);
       setActiveTab('dashboard');
+      
+      // Clear localStorage cache for the specific user
+      if (user) {
+        localStorage.removeItem(`inventory_data_${user.id}`);
+      }
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
       setIsLoggingOut(false);
-    }, 1500);
+    }
   };
 
   // PERSISTENCE HELPERS
@@ -256,6 +321,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         settings,
         setupComplete: user.setupComplete
       });
+      setLastSynced(new Date().toLocaleTimeString());
       console.log("Batch sync successful.");
     } catch (err) {
       console.error("Batch sync failed:", err);
@@ -409,6 +475,8 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const updateSettings = async (u: Partial<BusinessSettings>) => {
     setSettings(prev => ({ ...prev, ...sanitize(u) }));
+    // For settings, we sync immediately so theme changes are reflected across devices
+    setTimeout(syncAllToCloud, 0);
   };
 
   const clearAllData = async () => {
@@ -451,7 +519,10 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isLoggingIn, isLoggingOut,
       activeTab, setActiveTab,
       saleView, setSaleView,
-      cart, addToCart, updateCartQuantity, removeFromCart, clearCart
+      cart, addToCart, updateCartQuantity, removeFromCart, clearCart,
+      restockCart, addToRestockCart, updateRestockQuantity, removeFromRestockCart, clearRestockCart,
+      syncAllToCloud, lastSynced,
+      completeOnboarding
     }}>
       {children}
     </InventoryContext.Provider>
