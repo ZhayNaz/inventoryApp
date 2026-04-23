@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { InventoryProvider, useInventory } from './context/InventoryContext';
 import { BusinessStats } from './components/features/BusinessStats';
 import { InventoryList } from './components/features/InventoryList';
@@ -14,7 +14,7 @@ import { HistoryPage } from './components/features/HistoryPage';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { LoginLoadingScreen } from './components/auth/LoginLoadingScreen';
 import { LogoutLoadingScreen } from './components/auth/LogoutLoadingScreen';
-import { Plus, Menu } from 'lucide-react';
+import { Plus, Menu, ShoppingCart } from 'lucide-react';
 
 function App() {
   const { 
@@ -24,7 +24,9 @@ function App() {
     isLoggingOut,
     activeTab, 
     setActiveTab, 
-    settings 
+    settings,
+    cart,
+    setSaleView
   } = useInventory();
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -144,6 +146,66 @@ function App() {
       </AnimatePresence>
       
       {isAddModalOpen && <AddProductModal onClose={() => setIsAddModalOpen(false)} />}
+
+      {/* Global Floating Cart Notification */}
+      <AnimatePresence>
+        {cart.length > 0 && activeTab !== 'sale' && (
+          <motion.button
+            initial={{ scale: 0, y: 100, x: 100 }}
+            animate={{ scale: 1, y: 0, x: 0 }}
+            exit={{ scale: 0, y: 100, x: 100 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              setSaleView('checkout');
+              setActiveTab('sale');
+            }}
+            style={{
+              position: 'fixed',
+              bottom: 'calc(1.5rem + var(--safe-bottom))',
+              right: 'max(20px, calc(10px + var(--safe-right)))',
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: 'var(--primary)',
+              color: 'white',
+              border: 'none',
+              boxShadow: '0 12px 40px rgba(99, 102, 241, 0.5)',
+              cursor: 'pointer',
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <ShoppingCart size={28} strokeWidth={2.5} />
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              style={{ 
+                position: 'absolute', 
+                top: '-8px', 
+                right: '-8px', 
+                background: 'var(--accent-rose)', 
+                color: 'white', 
+                minWidth: '24px', 
+                height: '24px', 
+                padding: '0 6px', 
+                borderRadius: '12px', 
+                fontSize: '0.75rem', 
+                fontWeight: '900', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                boxShadow: '0 4px 12px rgba(244, 63, 94, 0.4)',
+                border: '2px solid var(--bg-dark)' 
+              }}
+            >
+              {cart.reduce((a, b) => a + b.quantity, 0)}
+            </motion.div>
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

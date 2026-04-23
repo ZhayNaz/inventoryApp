@@ -97,6 +97,13 @@ interface InventoryContextType {
   isLoggingOut: boolean;
   activeTab: string;
   setActiveTab: (t: string) => void;
+  saleView: 'products' | 'checkout';
+  setSaleView: (v: 'products' | 'checkout') => void;
+  cart: { product: Product; quantity: number }[];
+  addToCart: (p: Product) => void;
+  updateCartQuantity: (id: string, d: number) => void;
+  removeFromCart: (id: string) => void;
+  clearCart: () => void;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -120,6 +127,38 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     initialCapital: 0,
     theme: 'dark'
   });
+
+  const [saleView, setSaleView] = useState<'products' | 'checkout'>('products');
+  const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
+
+  const addToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.product.id === product.id);
+      if (existing) {
+        if (existing.quantity >= product.stock) return prev;
+        return prev.map(item => 
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  const updateCartQuantity = (productId: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.product.id === productId) {
+        const newQty = Math.max(1, Math.min(item.product.stock, item.quantity + delta));
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }));
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(item => item.product.id !== productId));
+  };
+
+  const clearCart = () => setCart([]);
 
   const guestLogin = async () => {
     await signInAnonymously(auth);
@@ -171,12 +210,14 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!auth.currentUser) throw new Error("No active guest session");
     const credential = EmailAuthProvider.credential(email.trim(), pass.trim());
     await linkWithCredential(auth.currentUser, credential);
+    await syncAllToCloud();
   };
 
   const logout = async () => {
     setIsLoggingOut(true);
     // Brief delay to show logout screen before clearing state
     setTimeout(async () => {
+      await syncAllToCloud();
       await signOut(auth);
       setUser(null);
       setProducts([]);
@@ -190,17 +231,68 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, 1500);
   };
 
-  // HELPER: Sync entire state to Firestore
-  const syncToCloud = async (updates: any) => {
+  // PERSISTENCE HELPERS
+  useEffect(() => {
     if (!user) return;
-    await updateDoc(doc(db, 'users', user.id), updates);
+    const localData = {
+      products, transactions, categories, suppliers, customers, debts, settings
+    };
+    localStorage.setItem(`inventory_data_${user.id}`, JSON.stringify(localData));
+  }, [user, products, transactions, categories, suppliers, customers, debts, settings]);
+
+  // NEW: Sync everything to cloud in one batch
+  const syncAllToCloud = async () => {
+    if (!user) return;
+    try {
+      console.log("Starting batch sync to cloud...");
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, {
+        products,
+        transactions,
+        categories,
+        suppliers,
+        customers,
+        debts,
+        settings,
+        setupComplete: user.setupComplete
+      });
+      console.log("Batch sync successful.");
+    } catch (err) {
+      console.error("Batch sync failed:", err);
+    }
   };
+
+  // Sync on app close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      syncAllToCloud();
+      // Most browsers don't wait for async calls in beforeunload,
+      // but firestore will try to sync in background if persistence is on.
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [user, products, transactions, categories, suppliers, customers, debts, settings]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setIsLoggingIn(true);
         const userRef = doc(db, 'users', firebaseUser.uid);
+        
+        // Try to load from localStorage first for immediate UI
+        const saved = localStorage.getItem(`inventory_data_${firebaseUser.uid}`);
+        if (saved) {
+          const data = JSON.parse(saved);
+          setProducts(data.products || []);
+          setTransactions(data.transactions || []);
+          setCategories(data.categories || []);
+          setSuppliers(data.suppliers || []);
+          setCustomers(data.customers || []);
+          setDebts(data.debts || []);
+          setSettings(data.settings || settings);
+        }
+
         const unsubDoc = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -266,63 +358,57 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // CRUD OPERATIONS (Arrays)
   const addProduct = async (p: Omit<Product, 'id'>) => {
     const newP = { ...sanitize(p), id: Date.now().toString() };
-    await syncToCloud({ products: [...products, newP] });
+    setProducts(prev => [...prev, newP]);
   };
 
   const updateProduct = async (id: string, u: Partial<Product>) => {
-    const updated = products.map(p => p.id === id ? { ...p, ...sanitize(u) } : p);
-    await syncToCloud({ products: updated });
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...sanitize(u) } : p));
   };
 
   const deleteProduct = async (id: string) => {
-    await syncToCloud({ products: products.filter(p => p.id !== id) });
+    setProducts(prev => prev.filter(p => p.id !== id));
   };
 
   const addCategory = async (name: string) => {
     const newC = { id: Date.now().toString(), name };
-    await syncToCloud({ categories: [...categories, newC] });
+    setCategories(prev => [...prev, newC]);
   };
 
   const addSupplier = async (s: Omit<Supplier, 'id'>) => {
     const newS = { ...sanitize(s), id: Date.now().toString() };
-    await syncToCloud({ suppliers: [...suppliers, newS] });
+    setSuppliers(prev => [...prev, newS]);
   };
 
   const addCustomer = async (c: Omit<Customer, 'id'>) => {
     const newC = { ...sanitize(c), id: Date.now().toString() };
-    await syncToCloud({ customers: [...customers, newC] });
+    setCustomers(prev => [...prev, newC]);
   };
 
   const addDebt = async (d: Omit<Debt, 'id' | 'status'>) => {
     const newD = { ...sanitize(d), id: Date.now().toString(), status: 'pending' };
-    await syncToCloud({ debts: [...debts, newD] });
+    setDebts(prev => [...prev, newD]);
   };
 
   const updateDebtStatus = async (id: string, status: 'pending' | 'paid') => {
-    await syncToCloud({ debts: debts.map(d => d.id === id ? { ...d, status } : d) });
+    setDebts(prev => prev.map(d => d.id === id ? { ...d, status } : d));
   };
 
   const recordTransaction = async (t: Omit<Transaction, 'id' | 'date'>) => {
     const newT = { ...sanitize(t), id: Date.now().toString(), date: new Date().toISOString() };
-    const newTransactions = [newT, ...transactions];
+    setTransactions(prev => [newT, ...prev]);
     
     // Update stock automatically
-    const updatedProducts = products.map(p => {
+    setProducts(prev => prev.map(p => {
       if (p.id === t.productId) {
         const stockChange = t.type === 'sale' ? -t.quantity : t.quantity;
         return { ...p, stock: p.stock + stockChange };
       }
       return p;
-    });
-
-    await syncToCloud({ 
-      transactions: newTransactions,
-      products: updatedProducts
-    });
+    }));
   };
 
   const updateSettings = async (u: Partial<BusinessSettings>) => {
-    await syncToCloud({ settings: { ...settings, ...sanitize(u) } });
+    setSettings(prev => ({ ...prev, ...sanitize(u) }));
   };
 
   const clearAllData = async () => {
@@ -363,7 +449,9 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addCategory, addSupplier, addCustomer, addDebt, updateDebtStatus, recordTransaction,
       updateSettings, clearAllData, clearCache, totalCapital, totalSales, totalProfit, inventoryValue, loading,
       isLoggingIn, isLoggingOut,
-      activeTab, setActiveTab
+      activeTab, setActiveTab,
+      saleView, setSaleView,
+      cart, addToCart, updateCartQuantity, removeFromCart, clearCart
     }}>
       {children}
     </InventoryContext.Provider>
