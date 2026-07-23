@@ -101,10 +101,6 @@ export const RestockPage: React.FC = () => {
       <AnimatePresence mode="wait">
         {restockView === 'products' ? (
           <motion.div key="products" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-            <div style={{ marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '0.5rem' }}>Restock Supply</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Select products to add to your restock list</p>
-            </div>
 
             <div style={{ position: 'relative', marginBottom: '2rem' }}>
               <Search size={22} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -118,7 +114,7 @@ export const RestockPage: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gap: '1rem' }}>
               {filteredProducts.map(product => {
                 const inCart = restockCart.find(item => item.product.id === product.id);
                 return (
@@ -131,16 +127,18 @@ export const RestockPage: React.FC = () => {
                       textAlign: 'left',
                       border: inCart ? '2px solid var(--accent-rose)' : '1px solid var(--glass-border)',
                       display: 'flex',
-                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                       gap: '1rem',
+                      width: '100%',
                       position: 'relative'
                     }}
                   >
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: '700', fontSize: '1.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{product.sku}</div>
                     </div>
-                    <div style={{ marginTop: 'auto' }}>
+                    <div style={{ textAlign: 'right', minWidth: '120px' }}>
                       <div style={{ fontSize: '1.25rem', color: 'var(--accent-rose)', fontWeight: '900' }}>{settings.currency}{product.costPrice}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>In Stock: {product.stock}</div>
                     </div>

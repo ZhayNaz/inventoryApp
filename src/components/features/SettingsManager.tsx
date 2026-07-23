@@ -4,22 +4,39 @@ import { User, Trash2, ChevronRight, Building, DollarSign, AlertCircle, RefreshC
 
 export const SettingsManager: React.FC = () => {
   const { user, settings, updateSettings, clearAllData, clearCache, upgradeAccount, syncAllToCloud, lastSynced } = useInventory();
+  const isGuestMode = Boolean(user?.isGuest);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
-  const [upgradeForm, setUpgradeForm] = useState({ email: '', password: '' });
+  const [upgradeForm, setUpgradeForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeError, setUpgradeError] = useState('');
+  const [upgradeMessage, setUpgradeMessage] = useState('');
 
   const handleUpgrade = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!upgradeForm.email.trim() || !upgradeForm.password || !upgradeForm.confirmPassword) {
+      setUpgradeError('Please fill in your email, password, and confirm password.');
+      return;
+    }
+
+    if (upgradeForm.password !== upgradeForm.confirmPassword) {
+      setUpgradeError('Passwords do not match.');
+      return;
+    }
+
     setUpgradeLoading(true);
     setUpgradeError('');
+    setUpgradeMessage('');
+
     try {
       await upgradeAccount(upgradeForm.email, upgradeForm.password);
-      alert('Account secured successfully! You can now log in from any device.');
+      setUpgradeMessage('Verification email sent. Please open the link in your inbox to complete the account upgrade.');
+      setUpgradeForm({ email: '', password: '', confirmPassword: '' });
       setIsUpgrading(false);
-    } catch (err: any) {
-      setUpgradeError(err.message || 'Linking failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Linking failed';
+      setUpgradeError(message);
     } finally {
       setUpgradeLoading(false);
     }
@@ -31,14 +48,28 @@ export const SettingsManager: React.FC = () => {
     setTimeout(() => setIsSyncing(false), 800);
   };
 
+  const handleGuestPrompt = () => {
+    setIsUpgrading(true);
+  };
+
   const handleClearData = () => {
+    if (isGuestMode) {
+      handleGuestPrompt();
+      return;
+    }
+
     if (confirm('Are you sure you want to clear all inventory and transactions? This cannot be undone.')) {
       clearAllData();
-      alert('All data has been cleared.');
+      alert('All data was cleared.');
     }
   };
 
   const handleClearCache = () => {
+    if (isGuestMode) {
+      handleGuestPrompt();
+      return;
+    }
+
     if (confirm('Clear local cache and reload? Your cloud data will remain safe.')) {
       clearCache();
     }
@@ -92,12 +123,21 @@ export const SettingsManager: React.FC = () => {
                 value={upgradeForm.password}
                 onChange={e => setUpgradeForm({ ...upgradeForm, password: e.target.value })}
               />
+              <input
+                required
+                type="password"
+                className="input-field"
+                placeholder="Confirm password"
+                value={upgradeForm.confirmPassword}
+                onChange={e => setUpgradeForm({ ...upgradeForm, confirmPassword: e.target.value })}
+              />
               {upgradeError && <p style={{ color: 'var(--accent-rose)', fontSize: '0.75rem' }}>{upgradeError}</p>}
+              {upgradeMessage && <p style={{ color: 'var(--accent-emerald)', fontSize: '0.75rem' }}>{upgradeMessage}</p>}
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button type="submit" disabled={upgradeLoading} className="btn btn-primary" style={{ flex: 1 }}>
-                  {upgradeLoading ? 'Linking...' : 'Secure Account'}
+                  {upgradeLoading ? 'Processing...' : 'Send Verification Email'}
                 </button>
-                <button type="button" onClick={() => setIsUpgrading(false)} className="btn" style={{ background: 'rgba(255,255,255,0.05)' }}>Cancel</button>
+                <button type="button" onClick={() => { setIsUpgrading(false); setUpgradeError(''); setUpgradeMessage(''); }} className="btn" style={{ background: 'rgba(255,255,255,0.05)' }}>Cancel</button>
               </div>
             </form>
           )}
@@ -124,7 +164,14 @@ export const SettingsManager: React.FC = () => {
             className="input-field"
             value={settings.businessName}
             onChange={(e) => updateSettings({ businessName: e.target.value })}
+            disabled={isGuestMode}
+            placeholder={isGuestMode ? 'Sign in or create an account to edit' : 'Enter business name'}
           />
+          {isGuestMode && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+              Sign in or create an account to manage your business details securely.
+            </p>
+          )}
         </div>
       </div>
 
@@ -143,12 +190,12 @@ export const SettingsManager: React.FC = () => {
             </div>
           </div>
           <button 
-            onClick={handleManualSync}
-            disabled={isSyncing}
+            onClick={isGuestMode ? handleGuestPrompt : handleManualSync}
+            disabled={isSyncing || isGuestMode}
             className="btn btn-primary" 
             style={{ padding: '0.6rem 1rem', fontSize: '0.85rem' }}
           >
-            {isSyncing ? 'Syncing...' : 'Sync Now'}
+            {isGuestMode ? 'Login / Create Account' : isSyncing ? 'Syncing...' : 'Sync Now'}
           </button>
         </div>
       </div>
@@ -243,6 +290,11 @@ export const SettingsManager: React.FC = () => {
 
       <h3 style={{ fontSize: '1rem', color: 'var(--text-muted)', marginBottom: '1rem', marginLeft: '0.5rem' }}>Danger Zone</h3>
       <div className="glass-card" style={{ marginBottom: '2rem', display: 'grid', gap: '1rem' }}>
+        {isGuestMode && (
+          <div style={{ padding: '0.75rem', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+            Sign in or create an account to unlock these controls and protect your data better.
+          </div>
+        )}
         <button
           onClick={handleClearCache}
           style={{
@@ -252,9 +304,10 @@ export const SettingsManager: React.FC = () => {
             alignItems: 'center',
             background: 'none',
             border: 'none',
-            color: 'var(--text-main)',
-            cursor: 'pointer',
-            padding: '0.5rem 0'
+            color: isGuestMode ? 'var(--text-muted)' : 'var(--text-main)',
+            cursor: isGuestMode ? 'not-allowed' : 'pointer',
+            padding: '0.5rem 0',
+            opacity: isGuestMode ? 0.7 : 1
           }}
         >
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -278,9 +331,10 @@ export const SettingsManager: React.FC = () => {
             alignItems: 'center',
             background: 'none',
             border: 'none',
-            color: 'var(--accent-rose)',
-            cursor: 'pointer',
-            padding: '0.5rem 0'
+            color: isGuestMode ? 'var(--text-muted)' : 'var(--accent-rose)',
+            cursor: isGuestMode ? 'not-allowed' : 'pointer',
+            padding: '0.5rem 0',
+            opacity: isGuestMode ? 0.7 : 1
           }}
         >
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>

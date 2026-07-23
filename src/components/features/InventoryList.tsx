@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
 import { useInventory } from '../../context/InventoryContext';
-import { Search, Package, Trash2 } from 'lucide-react';
+import { Search, Package, Trash2, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AddProductModal } from '../ui/AddProductModal';
 
 export const InventoryList: React.FC = () => {
   const { products, deleteProduct, settings } = useInventory();
   const [search, setSearch] = useState('');
+  const [editingProduct, setEditingProduct] = useState<null | {
+    id: string;
+    name: string;
+    sku: string;
+    stock: number;
+    costPrice: number;
+    sellingPrice: number;
+    imageUrl?: string;
+  }>(null);
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -44,13 +54,19 @@ export const InventoryList: React.FC = () => {
                 width: '50px', 
                 height: '50px', 
                 borderRadius: '12px', 
+                overflow: 'hidden',
                 background: 'rgba(99, 102, 241, 0.1)', 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                color: 'var(--primary)'
+                color: 'var(--primary)',
+                flexShrink: 0
               }}>
-                <Package size={24} />
+                {product.imageUrl ? (
+                  <img src={product.imageUrl} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Package size={24} />
+                )}
               </div>
               
               <div style={{ flex: 1 }}>
@@ -65,7 +81,19 @@ export const InventoryList: React.FC = () => {
 
               <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '0.5rem' }}>
                 <button 
-                  onClick={() => deleteProduct(product.id)}
+                  onClick={() => setEditingProduct(product)}
+                  title="Edit"
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '0.5rem', cursor: 'pointer', opacity: 0.7 }}
+                >
+                  <Pencil size={18} />
+                </button>
+                <button 
+                  onClick={() => {
+                    const confirmed = window.confirm(`Delete ${product.name}?`);
+                    if (confirmed) {
+                      deleteProduct(product.id);
+                    }
+                  }}
                   title="Delete"
                   style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '0.5rem', cursor: 'pointer', opacity: 0.5 }}
                 >
@@ -83,6 +111,13 @@ export const InventoryList: React.FC = () => {
           <Package size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
           <p>No products found</p>
         </div>
+      )}
+
+      {editingProduct && (
+        <AddProductModal
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+        />
       )}
     </div>
   );

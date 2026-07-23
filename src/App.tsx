@@ -55,6 +55,10 @@ function App() {
     return <LandingPage />;
   }
 
+  const saleButtonBottom = cart.length > 0 ? 'calc(5.5rem + var(--safe-bottom))' : 'calc(1rem + var(--safe-bottom))';
+  const cartButtonBottom = restockCart.length > 0 && activeTab !== 'restock' ? 'calc(8.5rem + var(--safe-bottom))' : 'calc(1rem + var(--safe-bottom))';
+  const restockButtonBottom = cart.length > 0 && activeTab !== 'sale' ? 'calc(5.5rem + var(--safe-bottom))' : 'calc(1rem + var(--safe-bottom))';
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -123,8 +127,8 @@ function App() {
           onClick={() => setIsAddModalOpen(true)}
           style={{ 
             position: 'fixed', 
-            right: 'max(20px, calc(10px + var(--safe-right)))', 
-            bottom: 'calc(100px + var(--safe-bottom))', 
+            right: 'max(1rem, calc(1rem + var(--safe-right)))', 
+            bottom: 'calc(1rem + var(--safe-bottom))', 
             borderRadius: '50%', 
             width: '64px', 
             height: '64px', 
@@ -134,6 +138,39 @@ function App() {
         >
           <Plus size={36} />
         </button>
+      )}
+
+      {activeTab === 'dashboard' && (
+        <motion.button
+          initial={{ scale: 0, y: 100, x: 100 }}
+          animate={{ scale: 1, y: 0, x: 0 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            setSaleView('products');
+            setActiveTab('sale');
+          }}
+          style={{
+            position: 'fixed',
+            bottom: saleButtonBottom,
+            right: 'max(1rem, calc(1rem + var(--safe-right)))',
+            width: '64px',
+            height: '64px',
+            borderRadius: '20px',
+            background: 'var(--accent-emerald)',
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 12px 40px rgba(16, 185, 129, 0.4)',
+            cursor: 'pointer',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          aria-label="Start new sale"
+        >
+          <ShoppingCart size={28} strokeWidth={2.5} />
+        </motion.button>
       )}
 
       <AnimatePresence>
@@ -164,8 +201,8 @@ function App() {
             }}
             style={{
               position: 'fixed',
-              bottom: 'calc(1.5rem + var(--safe-bottom))',
-              right: 'max(20px, calc(10px + var(--safe-right)))',
+              bottom: cartButtonBottom,
+              right: 'max(1rem, calc(1rem + var(--safe-right)))',
               width: '64px',
               height: '64px',
               borderRadius: '20px',
@@ -221,8 +258,8 @@ function App() {
             onClick={() => setActiveTab('restock')}
             style={{
               position: 'fixed',
-              bottom: cart.length > 0 && activeTab !== 'sale' ? 'calc(5.5rem + var(--safe-bottom))' : 'calc(1.5rem + var(--safe-bottom))',
-              right: 'max(20px, calc(10px + var(--safe-right)))',
+              bottom: restockButtonBottom,
+              right: 'max(1rem, calc(1rem + var(--safe-right)))',
               width: '64px',
               height: '64px',
               borderRadius: '20px',

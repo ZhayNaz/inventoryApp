@@ -130,10 +130,6 @@ export const SalePage: React.FC = () => {
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3 }}
           >
-            <div style={{ marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '0.5rem' }}>Storefront</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Select items to populate the current order</p>
-            </div>
 
             <div style={{ position: 'relative', marginBottom: '2rem' }}>
               <Search size={22} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -147,7 +143,7 @@ export const SalePage: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {filteredProducts.map(product => {
                 const inCart = cart.find(item => item.product.id === product.id);
                 const outOfStock = product.stock <= 0;
@@ -160,24 +156,32 @@ export const SalePage: React.FC = () => {
                     disabled={outOfStock || maxReached}
                     className="glass-card glass-card-hover"
                     style={{ 
-                      padding: '1.25rem', 
+                      padding: '1rem', 
                       textAlign: 'left', 
                       border: inCart ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
                       opacity: (outOfStock || maxReached) ? 0.4 : 1,
                       display: 'flex',
-                      flexDirection: 'column',
+                      alignItems: 'center',
                       gap: '1rem',
-                      position: 'relative'
+                      position: 'relative',
+                      width: '100%'
                     }}
                   >
-                    <div>
+                    <div style={{ width: '72px', height: '72px', borderRadius: '14px', overflow: 'hidden', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <ShoppingBag size={24} style={{ color: 'var(--text-muted)' }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: '700', fontSize: '1.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{product.sku}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>{product.sku}</div>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{product.stock} available</div>
                     </div>
                     
-                    <div style={{ marginTop: 'auto' }}>
-                      <div style={{ fontSize: '1.25rem', color: 'var(--accent-emerald)', fontWeight: '900' }}>{settings.currency}{product.sellingPrice}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{product.stock} available</div>
+                    <div style={{ textAlign: 'right', marginLeft: 'auto' }}>
+                      <div style={{ fontSize: '1.1rem', color: 'var(--accent-emerald)', fontWeight: '900' }}>{settings.currency}{product.sellingPrice}</div>
                     </div>
 
                     {inCart && (
@@ -254,8 +258,12 @@ export const SalePage: React.FC = () => {
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
-                      <ShoppingBag size={24} />
+                    <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                      {item.product.imageUrl ? (
+                        <img src={item.product.imageUrl} alt={item.product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <ShoppingBag size={24} />
+                      )}
                     </div>
                     <div>
                       <div style={{ fontWeight: '800', fontSize: '1.1rem' }}>{item.product.name}</div>

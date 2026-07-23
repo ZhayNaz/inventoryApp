@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -7,7 +7,8 @@ import {
   linkWithCredential,
   EmailAuthProvider,
   sendEmailVerification,
-  signOut
+  signOut,
+  type ActionCodeSettings
 } from 'firebase/auth';
 import { 
   terminate,
@@ -27,6 +28,7 @@ export interface Product {
   costPrice: number;
   sellingPrice: number;
   stock: number;
+  imageUrl?: string;
   categoryId?: string;
   supplierId?: string;
 }
@@ -142,6 +144,24 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [isInitialSyncComplete, setIsInitialSyncComplete] = useState(false);
 
+  const productsRef = useRef(products);
+  const transactionsRef = useRef(transactions);
+  const categoriesRef = useRef(categories);
+  const suppliersRef = useRef(suppliers);
+  const customersRef = useRef(customers);
+  const debtsRef = useRef(debts);
+  const settingsRef = useRef(settings);
+  const userRef = useRef(user);
+
+  useEffect(() => { productsRef.current = products; }, [products]);
+  useEffect(() => { transactionsRef.current = transactions; }, [transactions]);
+  useEffect(() => { categoriesRef.current = categories; }, [categories]);
+  useEffect(() => { suppliersRef.current = suppliers; }, [suppliers]);
+  useEffect(() => { customersRef.current = customers; }, [customers]);
+  useEffect(() => { debtsRef.current = debts; }, [debts]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
@@ -213,12 +233,18 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     await signInAnonymously(auth);
   };
 
+  const getEmailVerificationSettings = (): ActionCodeSettings => ({
+    url: `${window.location.origin}/?emailVerified=1`,
+    handleCodeInApp: false,
+  });
+
   const login = async (email: string, pass: string) => {
     setIsLoggingIn(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), pass.trim());
-    } catch (err: any) {
-      console.error("Firebase Login Error:", err.code, err.message);
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
+      console.error("Firebase Login Error:", error.code, error.message);
       setIsLoggingIn(false);
       throw err;
     }
@@ -229,7 +255,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const res = await createUserWithEmailAndPassword(auth, email.trim(), pass.trim());
       
       // 1. Send verification link (Our "OTP" equivalent)
-      await sendEmailVerification(res.user);
+      await sendEmailVerification(res.user, getEmailVerificationSettings());
       
       // 2. Create the profile
       await setDoc(doc(db, 'users', res.user.uid), {
@@ -249,8 +275,9 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           theme: 'dark'
         }
       });
-    } catch (err: any) {
-      console.error("Firebase Register Error:", err.code, err.message);
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
+      console.error("Firebase Register Error:", error.code, error.message);
       throw err;
     }
   };
@@ -259,6 +286,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!auth.currentUser) throw new Error("No active guest session");
     const credential = EmailAuthProvider.credential(email.trim(), pass.trim());
     await linkWithCredential(auth.currentUser, credential);
+
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser, getEmailVerificationSettings());
+      await auth.currentUser.reload();
+    }
+
     await syncAllToCloud();
   };
 
@@ -307,38 +340,39 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [user, products, transactions, categories, suppliers, customers, debts, settings]);
 
   // NEW: Sync everything to cloud in one batch
-  const syncAllToCloud = async () => {
-    if (!user || !isInitialSyncComplete) return;
+  const syncAllToCloud = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser || !isInitialSyncComplete) return;
     try {
       console.log("Starting batch sync to cloud...");
-      const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, {
-        products,
-        transactions,
-        categories,
-        suppliers,
-        customers,
-        debts,
-        settings,
-        setupComplete: user.setupComplete
+      const userDocRef = doc(db, 'users', currentUser.id);
+      await updateDoc(userDocRef, {
+        products: productsRef.current,
+        transactions: transactionsRef.current,
+        categories: categoriesRef.current,
+        suppliers: suppliersRef.current,
+        customers: customersRef.current,
+        debts: debtsRef.current,
+        settings: settingsRef.current,
+        setupComplete: currentUser.setupComplete
       });
       setLastSynced(new Date().toLocaleTimeString());
       console.log("Batch sync successful.");
     } catch (err) {
       console.error("Batch sync failed:", err);
     }
-  };
+  }, [isInitialSyncComplete]);
 
   // Sync on app close
   useEffect(() => {
     const handleBeforeUnload = () => {
-      syncAllToCloud();
+      void syncAllToCloud();
       // Most browsers don't wait for async calls in beforeunload,
       // but firestore will try to sync in background if persistence is on.
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [user, products, transactions, categories, suppliers, customers, debts, settings]);
+  }, [syncAllToCloud]);
 
 
   useEffect(() => {
@@ -357,7 +391,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setSuppliers(data.suppliers || []);
           setCustomers(data.customers || []);
           setDebts(data.debts || []);
-          setSettings(data.settings || settings);
+          setSettings(prev => data.settings || prev);
         }
 
         const unsubDoc = onSnapshot(userRef, (docSnap) => {
@@ -417,10 +451,10 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   // SANITIZE HELPER
-  const sanitize = (obj: any) => {
-    const clean = { ...obj };
+  const sanitize = <T extends Record<string, unknown>>(obj: T): T => {
+    const clean = { ...obj } as Record<string, unknown>;
     Object.keys(clean).forEach(k => clean[k] === undefined && delete clean[k]);
-    return clean;
+    return clean as T;
   };
 
   // CRUD OPERATIONS (Arrays)
@@ -459,7 +493,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const addDebt = async (d: Omit<Debt, 'id' | 'status'>) => {
-    const newD = { ...sanitize(d), id: Date.now().toString(), status: 'pending' };
+    const newD: Debt = { ...sanitize(d), id: Date.now().toString(), status: 'pending' };
     setDebts(prev => [...prev, newD]);
     setTimeout(syncAllToCloud, 0);
   };
@@ -543,6 +577,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useInventory = () => {
   const context = useContext(InventoryContext);
   if (!context) throw new Error('useInventory must be used within InventoryProvider');

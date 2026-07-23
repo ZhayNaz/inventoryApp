@@ -2,7 +2,6 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   Package, 
-  ShoppingCart, 
   Settings, 
   History, 
   PackagePlus,
@@ -24,7 +23,6 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab,
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={22} /> },
     { id: 'inventory', label: 'Inventory', icon: <Package size={22} /> },
-    { id: 'sale', label: 'New Sale', icon: <ShoppingCart size={22} /> },
     { id: 'restock', label: 'Restock', icon: <PackagePlus size={22} /> },
     { id: 'history', label: 'History', icon: <History size={22} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={22} /> },
