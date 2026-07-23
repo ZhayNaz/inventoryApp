@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useInventory } from '../../context/InventoryContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, TrendingUp, Globe, Smartphone, ArrowRight } from 'lucide-react';
+import { TrendingUp, Globe, Smartphone, ArrowRight } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const { user, login, register, upgradeAccount, guestLogin } = useInventory();
@@ -35,10 +35,10 @@ export const LandingPage: React.FC = () => {
           setError('success:Verification link sent to your email!');
         }
       }
-    } catch (err: any) {
-      console.error("Auth Exception:", err);
+    } catch (err: unknown) {
+      console.error('Auth Exception:', err);
       let msg = 'Authentication failed';
-      const code = err.code || '';
+      const code = err instanceof Error && 'code' in err ? String((err as { code?: string }).code || '') : '';
       
       const errorMap: Record<string, string> = {
         'auth/invalid-credential': 'Invalid email or password',
@@ -70,7 +70,7 @@ export const LandingPage: React.FC = () => {
     try {
       await guestLogin();
       setError('success:Entering Guest Mode... Synchronizing local workspace.');
-    } catch (err: any) {
+    } catch {
       setError('Guest login failed');
       setLoading(false);
       setTimeout(() => setError(''), 4000);
@@ -168,8 +168,8 @@ export const LandingPage: React.FC = () => {
       </AnimatePresence>
       <div style={{ padding: 'clamp(1rem, 5vw, 3rem) clamp(1rem, 5vw, 2rem) 1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
-          <div style={{ padding: '0.75rem', borderRadius: '15px', background: 'linear-gradient(135deg, var(--primary), #818cf8)' }}>
-            <Package color="white" size={32} />
+          <div style={{ padding: '0.4rem', borderRadius: '15px', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/favicon.png" alt="Inventory Pro logo" style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover' }} />
           </div>
           <div>
             <h1 style={{ fontSize: '1.75rem', lineHeight: '1' }}>Inventory Pro</h1>

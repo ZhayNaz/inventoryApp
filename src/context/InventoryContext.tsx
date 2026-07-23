@@ -6,9 +6,7 @@ import {
   signInAnonymously,
   linkWithCredential,
   EmailAuthProvider,
-  sendEmailVerification,
-  signOut,
-  type ActionCodeSettings
+  signOut
 } from 'firebase/auth';
 import { 
   terminate,
@@ -233,11 +231,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     await signInAnonymously(auth);
   };
 
-  const getEmailVerificationSettings = (): ActionCodeSettings => ({
-    url: `${window.location.origin}/?emailVerified=1`,
-    handleCodeInApp: false,
-  });
-
   const login = async (email: string, pass: string) => {
     setIsLoggingIn(true);
     try {
@@ -254,10 +247,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       const res = await createUserWithEmailAndPassword(auth, email.trim(), pass.trim());
       
-      // 1. Send verification link (Our "OTP" equivalent)
-      await sendEmailVerification(res.user, getEmailVerificationSettings());
-      
-      // 2. Create the profile
+      // Create the profile
       await setDoc(doc(db, 'users', res.user.uid), {
         businessName,
         setupComplete: false,
@@ -286,11 +276,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!auth.currentUser) throw new Error("No active guest session");
     const credential = EmailAuthProvider.credential(email.trim(), pass.trim());
     await linkWithCredential(auth.currentUser, credential);
-
-    if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser, getEmailVerificationSettings());
-      await auth.currentUser.reload();
-    }
 
     await syncAllToCloud();
   };

@@ -69,7 +69,10 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-          <div style={{ fontWeight: '800', fontSize: '1.25rem', color: 'var(--primary)' }}>Inventory Pro</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <img src="/favicon.png" alt="Inventory Pro logo" style={{ width: '36px', height: '36px', borderRadius: '10px', objectFit: 'cover' }} />
+            <div style={{ fontWeight: '800', fontSize: '1.1rem', color: 'var(--primary)' }}>Inventory Pro</div>
+          </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)' }}>
             <X size={24} />
           </button>
