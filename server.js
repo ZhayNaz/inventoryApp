@@ -150,10 +150,25 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required', code: 'auth/invalid-credential' });
+  }
+
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(400).json({ error: 'Invalid credentials' });
+  if (!user) {
+    return res.status(404).json({ 
+      error: 'No user found with this account. Please sign up', 
+      code: 'auth/user-not-found' 
+    });
+  }
+  
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(401).json({ 
+      error: 'Incorrect password. Please try again', 
+      code: 'auth/wrong-password' 
+    });
   }
   
   const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY);

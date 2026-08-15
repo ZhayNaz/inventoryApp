@@ -43,16 +43,16 @@ function App() {
     return <LogoutLoadingScreen />;
   }
 
+  if (!user) {
+    return <LandingPage />;
+  }
+
   if (isLoggingIn) {
     return <LoginLoadingScreen />;
   }
 
   if (loading) {
     return <LoadingScreen />;
-  }
-
-  if (!user) {
-    return <LandingPage />;
   }
 
   const saleButtonBottom = cart.length > 0 ? 'calc(5.5rem + var(--safe-bottom))' : 'calc(1rem + var(--safe-bottom))';

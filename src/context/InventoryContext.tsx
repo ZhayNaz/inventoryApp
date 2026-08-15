@@ -232,7 +232,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const login = async (email: string, pass: string) => {
-    setIsLoggingIn(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), pass.trim());
     } catch (err: unknown) {
@@ -364,22 +363,24 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setIsLoggingIn(true);
-        const userRef = doc(db, 'users', firebaseUser.uid);
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
         
         // Try to load from localStorage first for immediate UI
         const saved = localStorage.getItem(`inventory_data_${firebaseUser.uid}`);
         if (saved) {
-          const data = JSON.parse(saved);
-          setProducts(data.products || []);
-          setTransactions(data.transactions || []);
-          setCategories(data.categories || []);
-          setSuppliers(data.suppliers || []);
-          setCustomers(data.customers || []);
-          setDebts(data.debts || []);
-          setSettings(prev => data.settings || prev);
+          try {
+            const data = JSON.parse(saved);
+            setProducts(data.products || []);
+            setTransactions(data.transactions || []);
+            setCategories(data.categories || []);
+            setSuppliers(data.suppliers || []);
+            setCustomers(data.customers || []);
+            setDebts(data.debts || []);
+            setSettings(prev => data.settings || prev);
+          } catch { /* ignore malformed cache */ }
         }
 
-        const unsubDoc = onSnapshot(userRef, (docSnap) => {
+        const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setProducts(data.products || []);
@@ -405,8 +406,10 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setIsInitialSyncComplete(true);
             setIsLoggingIn(false);
           } else {
-            setDoc(userRef, {
+            // Document doesn't exist yet — create it
+            setDoc(userDocRef, {
               businessName: 'My Business',
+              setupComplete: false,
               products: [],
               transactions: [],
               categories: [],
@@ -420,15 +423,31 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 initialCapital: 0,
                 theme: 'dark'
               }
+            }).catch(writeErr => {
+              console.error("Failed to create user document:", writeErr);
             });
           }
           setLoading(false);
-        }, () => {
+        }, (err) => {
+          // Firestore permissions error — this can happen if rules are too restrictive
+          // or if the user's token is invalid. Sign out cleanly so the user sees the login screen.
+          console.error("Firestore onSnapshot error:", err);
+          if (
+            (err as { code?: string }).code === 'permission-denied' ||
+            String(err).toLowerCase().includes('permission') ||
+            String(err).toLowerCase().includes('insufficient')
+          ) {
+            console.warn("Firestore permission denied — signing out and returning to login.");
+            signOut(auth).catch(() => {});
+            setUser(null);
+          }
+          setIsLoggingIn(false);
           setLoading(false);
         });
         return () => unsubDoc();
       } else {
         setUser(null);
+        setIsLoggingIn(false);
         setLoading(false);
       }
     });
